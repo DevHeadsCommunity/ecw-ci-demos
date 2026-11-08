@@ -1,124 +1,70 @@
-# ECW CI GitHub Actions Templates
+# ECW CI demos
 
-A ready-to-copy GitHub Actions pipeline that books a real (or virtual) board
-on an ECW backend, flashes your firmware onto it, runs hardware-in-the-loop
-CI jobs against it, and releases the booking -- for **any** board, **any**
-build process, and **any** set of CI jobs. Nothing in `.github/workflows/`
-or `.github/scripts/` is project-specific; everything project-specific
-lives in `.github/user/` and your repo's own GitHub config.
+Examples of GitHub Actions workflows that build firmware, program a booked board, run hardware tests through ECW, and publish the results.
 
-```
-Build → Reserve → Wait → Configure HIL → Upload + explicit flash → Test → Collect → Release
-```
+Choose a demo branch below. Each demo runs manually from GitHub Actions and includes its firmware, client scripts, documentation and flow diagram.
 
-## Single-workflow method
+## Choose a demo
 
-Build, reserve and wait for an active booking in one workflow, then configure
-HIL, upload and explicitly flash firmware, run jobs, and release the booking.
-
-![Single-workflow method: wait for the booking, configure HIL, upload and flash firmware, then run jobs](docs/diagrams/one-stage-method.svg)
-
-## Two-stage method
-
-Stage 1 builds and reserves, registers the activation trigger, then ends.
-ECW starts Stage 2 when the booking is active. The claim winner configures
-HIL, uploads and flashes firmware, runs jobs, and releases the booking.
-
-![Two-stage method: Stage 1 ends; ECW dispatches Stage 2 to claim, configure HIL, upload and flash firmware, then run jobs](docs/diagrams/two-stage-method.svg)
-
-Workflow files are on `delelop_2_stages`; follow
-[the two-stage setup guide](docs/07-trigger-mode.md).
-
-See [docs/](docs/) for the full walkthrough:
-
-| Doc | What it covers |
-| --- | --- |
-| [docs/01-getting-started.md](docs/01-getting-started.md) | **Start here.** Use this template, add the secret and variable, create jobs, first Arduino run on dev.edgebench.io |
-| [docs/02-secrets-and-variables.md](docs/02-secrets-and-variables.md) | Creating an API token, repo secrets, repo variables |
-| [docs/03-build-script.md](docs/03-build-script.md) | Writing `.github/user/build/build.sh` for your own project |
-| [docs/04-jobs.md](docs/04-jobs.md) | The CI job / command JSON schema, and the payload generator |
-| [docs/05-api-reference.md](docs/05-api-reference.md) | The ECW backend endpoints this pipeline calls |
-| [docs/06-support-and-liability.md](docs/06-support-and-liability.md) | **Read this** -- what's supported, what's on you |
-| [docs/07-trigger-mode.md](docs/07-trigger-mode.md) | Two-stage setup from `delelop_2_stages`, default-branch requirements and activation claims |
-| [docs/08-arduino-demo.md](docs/08-arduino-demo.md) | The bundled Arduino UNO R4 WiFi demo, explained in full |
-| [docs/09-wait-mode.md](docs/09-wait-mode.md) | The default pipeline job by job: timeouts, booking reuse, artifacts, failures |
-| [docs/10-hil-configuration.md](docs/10-hil-configuration.md) | Configure HIL, frontend-format CSV values, readiness timeout, and upload/flash sequencing |
-
-## Repository layout
-
-```
-.github/
-  workflows/ci-job-smoke.yml   Generic pipeline. Copy as-is; do not edit.
-  scripts/*.py                 Generic helpers the workflow calls. Copy as-is; do not edit.
-  user/
-    build/build.sh              Yours: how your firmware gets built.
-    jobs/*.json                 Yours: which CI jobs run against the board.
-    hil/*.csv                   Yours: frontend-format physical HIL values.
-scripts/
-  generate_job_payload.py       Scaffolds a new .github/user/jobs/*.json file.
-src/                             Example firmware (Arduino UNO R4 WiFi) -- replace with your own.
-docs/                             This documentation, including diagrams.
-tests/                            Offline client checks; no board or API key required.
-```
-
-## Branches
-
-- `main` -- the default template, using one workflow with a booking Wait job.
-  Documentation for both wait mode and two-stage mode is available here.
-- `develop` -- development of the template. Check its workflow triggers when
-  choosing which branch to copy.
-- `delelop_2_stages` -- the two-stage version, formerly named `trigger`.
-  Stage 1 builds and reserves; ECW starts Stage 2 after session activation.
-  Stage 2 claims the run, configures HIL, uploads and flashes MCU firmware,
-  runs jobs, and releases the booking.
-
-The two-stage workflow files are on `delelop_2_stages`, not on this branch.
-Copy them into the default branch of the repository that will run them;
-see [the two-stage setup guide](docs/07-trigger-mode.md).
-
-## Quick start
-
-1. Click **Use this template > Create a new repository** on this page (or
-   copy `.github/`, `scripts/`, `src/`, and `tests/` into your own repo).
-2. Follow [docs/01-getting-started.md](docs/01-getting-started.md): it walks
-   through the `ECW_API_KEY` secret, the `BOARD_NAME` variable, the CI job
-   files, and your first run on the Arduino UNO R4 WiFi.
-3. Want ECW to wake your pipeline instead of a runner polling? See the
-   [two-stage setup](docs/07-trigger-mode.md) using `delelop_2_stages`.
-
-## HIL configuration and firmware upload
-
-Set `HIL_SENSOR_NAME` and place frontend-format CSV values under
-`.github/user/hil/`. Configure HIL prepares the approved sensor image, waits
-for programming and activation to succeed within three minutes, and sends
-the CSV values.
-The following Upload step stores the MCU firmware and explicitly flashes it;
-Test starts only after both operations succeed. Blank `HIL_SENSOR_NAME`
-skips the HIL setup. See [the HIL guide](docs/10-hil-configuration.md).
-
-Offline client checks: `python3 -m unittest discover -s tests -v`.
-
-## Configure your repository before running
-
-A template copy does not inherit the source repository's secrets or variables.
-Set them under **Settings > Secrets and variables > Actions**:
-
-| Setting | Type | Purpose |
+| Demo branch | What it does | Evidence |
 | --- | --- | --- |
-| `ECW_API_KEY` | Secret | Token for the chosen ECW environment and booking owner. |
-| `BOARD_NAME` | Variable | Board type to book; required. |
-| `ECW_BACKEND_URL` | Variable | API base URL for that environment. Production example: `https://www.edgebench.io/api`. |
-| `HIL_SENSOR_NAME` | Variable | Exact inventory sensor name. Blank skips HIL configuration. |
-| `HIL_CSV_FILE` | Variable, optional | CSV path relative to `.github/user/hil/`; defaults to the selected sensor's example file. |
-| `ECW_DISPATCH_PAT` | Secret, two-stage mode | Credential allowing ECW to dispatch Stage 2. |
+| [demo/ra6-blinky-camera](https://github.com/DevHeadsCommunity/ecw-ci-demos/tree/demo/ra6-blinky-camera) | Toggle the LED every **50 ms** and save screenshots every **30 ms** during a **2-second** window. | 67 JPEG files, an HTML gallery, actual capture timestamps and source frame counts. |
+| [demo/ra6-hello-serial](https://github.com/DevHeadsCommunity/ecw-ci-demos/tree/demo/ra6-hello-serial) | Capture **5 seconds** of serial output and check consecutive numbered greetings. | Serial log, CI job results and verification report. |
+| [demo/ra6-hil-50-samples](https://github.com/DevHeadsCommunity/ecw-ci-demos/tree/demo/ra6-hil-50-samples) | Configure BME280 HIL using **50 frontend-format CSV samples**, then compare the board's SPI readings with those values. | Configuration report, 150 verified encoded words and 50 DUT readings. |
+| [demo/ra6-zephyr-twister](https://github.com/DevHeadsCommunity/ecw-ci-demos/tree/demo/ra6-zephyr-twister) | Run the trusted Zephyr Twister suite: firmware identification, five nonce echoes and increasing uptime. | Job metadata, Twister JSON, JUnit XML and diagnostic logs. |
 
-Use CSV files exported from the frontend; the provided files contain 100
-physical-value samples. Configure HIL uses the existing frontend APIs and
-waits up to three minutes for preparation/activation success before sending
-the CSV. The Upload step then stores the MCU firmware and explicitly flashes
-it before jobs start. No new backend route is required.
+The branch names identify the current hardware target. Check the selected branch's README for its board identity and wiring before running it.
 
-The selected backend must already expose `/v1/peripheral-prepare` and the
-other routes in [the HIL guide](docs/10-hil-configuration.md). An older backend
-without this route cannot complete Configure HIL. See
-[secrets and variables](docs/02-secrets-and-variables.md) for setup details.
+## Run a demo manually
+
+1. Open **Settings → Secrets and variables → Actions** and add the repository secret **`ECW_API_KEY`** for your ECW account.
+2. Open **Actions → ECW CI Job Smoke → Run workflow**. Select a demo branch from the table, rather than `main`. The workflow file is `.github/workflows/ci-job-smoke.yml`; its name on the demo branches is **RA6 manual demo**.
+3. Leave **`booking_id`** blank to create a CI booking, or enter your active booking for the configured board. A supplied booking must have more than six minutes remaining. Close other terminals using its serial console.
+4. Start the workflow, then download its artifact. The blinky artifact includes `artifacts/camera.html` for browsing the screenshots locally.
+
+Demo branches use **`workflow_dispatch` only**: pushing a commit or opening a pull request does not start a hardware test. They share one hardware concurrency group; run them one at a time.
+
+| Repository setting | Type | Purpose |
+| --- | --- | --- |
+| `ECW_API_KEY` | Required secret | Authenticate as the booking owner. |
+| `ECW_BACKEND_URL` | Optional variable | Override the default API base, `https://plovdiv.edgebench.io/api`. |
+| `ECW_CONSOLE_URL` | Optional variable | Override the default console base, `wss://plovdiv.edgebench.io`. |
+
+The demos set their board configuration themselves. No `BOARD_NAME`, `HIL_SENSOR_NAME` or `HIL_CSV_FILE` variable is required. The HIL branch includes its 50-row CSV under `.github/user/hil/`.
+
+## Execution lifecycle
+
+```text
+Manual run → Build and offline checks → Active booking → Demo execution → Evidence → Cleanup
+```
+
+For the blinky, hello and CSV HIL demos, firmware upload and programming are separate operations:
+
+1. **Upload:** `/upload` stores the built HEX on NFS; the client verifies the stored filename.
+2. **Flash:** a separate request to `/v1/artifacts/my-uploads` programs that exact stored file.
+3. **Test:** start only after programming succeeds. The CSV HIL demo completes sensor preparation and value configuration before uploading or flashing the MCU firmware.
+
+The Twister demo submits the trusted `ci_twister_test` backend profile. Twister and its pytest/RM integration own the runtime build, flash and serial access. The GitHub build is a build-only check; the client does not request an additional hardware flash. The selected backend must already have that reviewed profile installed.
+
+Cleanup closes the connections and releases bookings created by the workflow. Caller-supplied bookings are preserved. Available evidence is published after failures as well as successful runs.
+
+## Read the results
+
+A 30 ms screenshot save interval does not guarantee a new camera exposure every 30 ms. Slower camera delivery can repeat a source frame across several saved JPEGs. The blinky report records source frame numbers, ages and actual timestamps; inspect the gallery to confirm the LED is visible and blinking. Optical ON/OFF classification is manual.
+
+All four firmware applications have been compiled, and each branch passes 49 offline client checks. Twister build-only discovery also passes. These checks do not establish a passing physical-board run; use the manual workflows to collect that evidence.
+
+## Template and documentation
+
+`main` retains the original template files and history and serves as the demo index. Its inherited workflow is separate from the manual demo workflows. Use a **demo branch** for these examples.
+
+The general-purpose source template is [ECW CI GitHub Actions Templates](https://github.com/DevHeadsCommunity/ECW_CI_Github_Actions_Templates). The demos adapt the Zephyr application structure from [nxp-zephyr-projects](https://github.com/DevHeadsCommunity/nxp-zephyr-projects) and hardware examples from ECW_Lab.
+
+Each demo branch has a focused README and SVG:
+
+- [Blinky lifecycle and timing](https://github.com/DevHeadsCommunity/ecw-ci-demos/blob/demo/ra6-blinky-camera/docs/flow.svg)
+- [Hello serial flow](https://github.com/DevHeadsCommunity/ecw-ci-demos/blob/demo/ra6-hello-serial/docs/flow.svg)
+- [CSV HIL flow](https://github.com/DevHeadsCommunity/ecw-ci-demos/blob/demo/ra6-hil-50-samples/docs/flow.svg)
+- [Twister flow](https://github.com/DevHeadsCommunity/ecw-ci-demos/blob/demo/ra6-zephyr-twister/docs/flow.svg)
+
+The inherited template guides remain under [docs/](docs/).
