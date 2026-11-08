@@ -135,7 +135,7 @@ class FirmwareFlowTests(unittest.TestCase):
         self.assertEqual(self.output.read_text(), "")
 
     def test_flash_rejects_missing_or_unsafe_code_without_http_calls(self):
-        for code in ("", "../firmware.bin", "my-app.bin", "a" * 61 + ".bin", "firmware.hex"):
+        for code in ("", "../firmware.bin", "my-app.bin", "a" * 61 + ".bin", "firmware.txt"):
             with self.subTest(code=code), patch.dict(os.environ, {"ECW_FIRMWARE_CODE": code}), patch.object(ecw_client.urllib.request, "urlopen") as http:
                 with self.assertRaises(SystemExit):
                     flash_firmware.main()
