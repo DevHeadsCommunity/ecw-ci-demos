@@ -1,261 +1,76 @@
-name: ECW CI Job Smoke
+name: RA6 manual demo
 
 on:
-  # Runs when a pull request is opened, updated with new commits, or
-  # reopened -- not on every push to a branch. Change the base branches to
-  # your own repo's -- this is the one thing in this file a copy of this
-  # template is expected to edit.
-  #
-  # Note: GitHub does not give secrets to pull requests opened from forks,
-  # so Reserve fails there ("Missing ECW_API_KEY"). Open PRs from a branch
-  # inside the same repository.
-  pull_request:
-    branches:
-      - develop
-      - main
-  workflow_dispatch: {}
+  workflow_dispatch:
+    inputs:
+      booking_id:
+        description: 'Optional active RA6 booking ID; blank creates and releases a CI booking'
+        type: string
+        required: false
 
-# Every run books, flashes and then releases the same board. Two runs at
-# once (two PRs, or two quick pushes to one PR) would race each other on
-# that booking, so runs queue instead of overlapping. Not cancel-in-progress:
-# cancelling a run mid-flight would skip Release and leave the booking held.
+permissions:
+  contents: read
+
+# One physical RA6: serialize all four demo branches. Never cancel a running flash.
 concurrency:
-  group: ecw-ci-${{ github.workflow }}
+  group: ecw-ra6-board-23
   cancel-in-progress: false
 
 env:
-  ECW_BACKEND_URL: ${{ vars.ECW_BACKEND_URL || 'https://api-dev.edgebench.io' }}
-  # No fallback on purpose: this workflow is general-purpose for ECW, not
-  # Arduino-specific, so the board it targets must come from the repo's own
-  # config (Settings > Actions > Variables) -- an unset value should stop
-  # the run with a clear error, not silently default to some board.
-  BOARD_NAME: ${{ vars.BOARD_NAME }}
-  # Auto-booking searches up to 24h ahead for a free slot (see
-  # autoBookBoard's search_until), so this stays high enough to cover that
-  # whole window rather than give up early.
-  ECW_BOOKING_WAIT_TIMEOUT_SECONDS: ${{ vars.ECW_BOOKING_WAIT_TIMEOUT_SECONDS || '86400' }}
-  ECW_JOB_WAIT_TIMEOUT_SECONDS: ${{ vars.ECW_JOB_WAIT_TIMEOUT_SECONDS || '180' }}
+  ECW_BACKEND_URL: ${{ vars.ECW_BACKEND_URL || 'https://plovdiv.edgebench.io/api' }}
+  ECW_CONSOLE_URL: ${{ vars.ECW_CONSOLE_URL || 'wss://plovdiv.edgebench.io' }}
+  ECW_BOOKING_ID: ${{ inputs.booking_id }}
 
 jobs:
-  build:
-    name: Build
-    runs-on: ubuntu-latest
+  demo:
+    name: Build and test RA6
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
     steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Run project build script
-        run: |
-          set -euo pipefail
-
-          if [ ! -x .github/user/build/build.sh ]; then
-            echo "Missing or non-executable .github/user/build/build.sh -- see .github/user/README.md."
-            exit 1
-          fi
-
-          .github/user/build/build.sh
-
-      - name: Upload firmware artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
         with:
-          name: ecw-firmware-${{ github.run_id }}
-          path: build/
-
-  reserve:
-    name: Reserve
-    runs-on: ubuntu-latest
-    needs: build
-    outputs:
-      booking_id: ${{ steps.booking.outputs.booking_id }}
-      board_name: ${{ steps.board.outputs.board_name }}
-
-    env:
-      ECW_API_KEY: ${{ secrets.ECW_API_KEY }}
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Check required secrets
+          python-version: '3.12'
+      - name: Install build tools
         run: |
-          set -euo pipefail
-
-          if [ -z "${ECW_API_KEY}" ]; then
-            echo "Missing ECW_API_KEY repository secret."
-            exit 1
-          fi
-
-      - name: Check required variables
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ninja-build gperf device-tree-compiler ccache xz-utils file make gcc g++
+          python -m pip install -r requirements-ci.txt
+      - name: Check demo contracts without hardware
+        run: python -m unittest discover -s tests -v
+      - name: Initialize pinned Zephyr workspace
         run: |
-          set -euo pipefail
-
-          if [ -z "${BOARD_NAME}" ]; then
-            echo "Missing BOARD_NAME repository variable (Settings > Actions > Variables)."
-            exit 1
-          fi
-
-      - name: Check backend health
-        run: |
-          set -euo pipefail
-
-          curl --fail --silent --show-error \
-            "${ECW_BACKEND_URL%/}/docs" \
-            --output /dev/null
-
-      - name: Select board type
-        id: board
-        run: python3 .github/scripts/select_board.py
-
-      - name: Find or create booking
-        id: booking
+          west init -l .
+          west update --narrow -o=--depth=1
+          python -m pip install -r ../zephyr/scripts/requirements.txt
+          west zephyr-export
+          west sdk install --version 0.17.2 --toolchains arm-zephyr-eabi --install-dir "$RUNNER_TEMP/zephyr-sdk-0.17.2"
+          echo "ZEPHYR_SDK_INSTALL_DIR=$RUNNER_TEMP/zephyr-sdk-0.17.2" >> "$GITHUB_ENV"
+          echo "ZEPHYR_BASE=$(realpath ../zephyr)" >> "$GITHUB_ENV"
+      - name: Build RA6 firmware (Twister branch also performs build-only discovery)
+        run: bash .github/user/build/build.sh
+      - name: Configure HIL if needed, upload, explicitly flash, test and release
         env:
-          ECW_BOARD_NAME: ${{ steps.board.outputs.board_name }}
-        run: python3 .github/scripts/find_or_create_booking.py
-
-      - name: Upload reserve artifacts
+          ECW_API_KEY: ${{ secrets.ECW_API_KEY }}
+        run: python .github/scripts/run_demo.py
+      - name: Release a booking created by this run (fallback after interruption)
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ecw-ci-reserve-${{ github.run_id }}
-          path: artifacts/
-          if-no-files-found: warn
-
-  wait:
-    name: Wait
-    runs-on: ubuntu-latest
-    needs: reserve
-    # GitHub's own job timeout defaults to 360 minutes and would kill this
-    # job regardless of ECW_BOOKING_WAIT_TIMEOUT_SECONDS. Auto-booking only
-    # searches up to 24h ahead, so give this a matching ceiling.
-    timeout-minutes: 1440
-
-    env:
-      ECW_API_KEY: ${{ secrets.ECW_API_KEY }}
-      ECW_BOOKING_ID: ${{ needs.reserve.outputs.booking_id }}
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Wait for booking to become active
-        run: python3 .github/scripts/wait_for_booking.py
-
-  configure-hil:
-    name: Configure HIL
-    runs-on: ubuntu-latest
-    needs: [reserve, wait]
-    timeout-minutes: 10
-
-    env:
-      ECW_API_KEY: ${{ secrets.ECW_API_KEY }}
-      ECW_BOOKING_ID: ${{ needs.reserve.outputs.booking_id }}
-      HIL_SENSOR_NAME: ${{ vars.HIL_SENSOR_NAME }}
-      HIL_CSV_FILE: ${{ vars.HIL_CSV_FILE }}
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Configure HIL and send frontend CSV values
-        run: python3 .github/scripts/configure_hil.py
-
-      - name: Save HIL configuration report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ecw-hil-${{ github.run_id }}
-          path: artifacts/hil-configuration.json
-          if-no-files-found: warn
-
-  upload:
-    name: Upload
-    runs-on: ubuntu-latest
-    needs: [reserve, configure-hil, build]
-
-    env:
-      ECW_API_KEY: ${{ secrets.ECW_API_KEY }}
-      ECW_BOOKING_ID: ${{ needs.reserve.outputs.booking_id }}
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Download firmware artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: ecw-firmware-${{ github.run_id }}
-          path: build
-
-      - name: Upload firmware, then explicitly flash the stored image
-        run: python3 .github/scripts/upload_and_flash.py
-
-  test:
-    name: Test
-    runs-on: ubuntu-latest
-    needs: [reserve, upload]
-
-    env:
-      ECW_API_KEY: ${{ secrets.ECW_API_KEY }}
-      ECW_BOOKING_ID: ${{ needs.reserve.outputs.booking_id }}
-      ECW_BOARD_NAME: ${{ needs.reserve.outputs.board_name }}
-
-    steps:
-      - name: Check out repository
-        uses: actions/checkout@v4
-
-      - name: Create wait, serial, and camera CI jobs
-        run: python3 .github/scripts/create_jobs.py
-
-      - name: Poll CI jobs and report results
-        run: python3 .github/scripts/poll_jobs.py
-
-      - name: Download CI job artifact bundles
-        if: always()
-        run: python3 .github/scripts/download_artifacts.py
-
-  collect:
-    name: Collect
-    runs-on: ubuntu-latest
-    needs: test
-    # Still runs (and grabs artifacts) whether Test itself passed or failed --
-    # only skips when Test never ran at all because an earlier job
-    # (Build/Reserve/Wait/Configure HIL/Upload) failed, since there's nothing to collect.
-    if: ${{ !cancelled() && needs.test.result != 'skipped' }}
-    steps:
-      - name: Upload CI job artifacts
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: ecw-ci-job-smoke-${{ github.run_id }}
-          path: artifacts/
-          if-no-files-found: warn
-
-  release:
-    name: Release
-    runs-on: ubuntu-latest
-    needs: [reserve, collect]
-    # Runs regardless of what happens downstream (Test/Collect failing must
-    # not skip cleanup) but only when Reserve actually produced a booking to
-    # release -- if Reserve itself failed there is nothing to cancel.
-    if: ${{ !cancelled() && needs.reserve.result == 'success' }}
-
-    env:
-      ECW_API_KEY: ${{ secrets.ECW_API_KEY }}
-      ECW_BOOKING_ID: ${{ needs.reserve.outputs.booking_id }}
-
-    steps:
-      - name: Cancel booking
-        if: always()
+        env:
+          ECW_API_KEY: ${{ secrets.ECW_API_KEY }}
         run: |
-          set -euo pipefail
-
-          if [ -z "${ECW_BOOKING_ID:-}" ] || [ -z "${ECW_API_KEY:-}" ]; then
-            echo "No booking/API key available; skipping reservation cleanup."
-            exit 0
+          if [ -f artifacts/reservation.json ] && [ ! -f artifacts/release.json ]; then
+            python .github/scripts/run_demo.py --release-only
           fi
-
-          curl --fail --silent --show-error \
-            --header "X-API-Key: ${ECW_API_KEY}" \
-            --get \
-            --data-urlencode "booking_id=${ECW_BOOKING_ID}" \
-            "${ECW_BACKEND_URL%/}/cancel-booking"
+      - name: Publish firmware and test evidence from this runner
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ra6-twister-${{ github.run_id }}-${{ github.run_attempt }}
+          path: |
+            build/firmware.hex
+            build/zephyr/zephyr/zephyr.elf
+            build/provenance.json
+            build/twister/twister.json
+            build/twister/twister.xml
+            artifacts/
+          if-no-files-found: warn

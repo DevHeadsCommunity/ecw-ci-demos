@@ -1,124 +1,46 @@
-# ECW CI GitHub Actions Templates
+# RA6 twister CI demo
 
-A ready-to-copy GitHub Actions pipeline that books a real (or virtual) board
-on an ECW backend, flashes your firmware onto it, runs hardware-in-the-loop
-CI jobs against it, and releases the booking -- for **any** board, **any**
-build process, and **any** set of CI jobs. Nothing in `.github/workflows/`
-or `.github/scripts/` is project-specific; everything project-specific
-lives in `.github/user/` and your repo's own GitHub config.
+Branch: `demo/ra6-zephyr-twister`. Physical board: **FPB-RA6E2**, ECW board **23**, Zephyr target `fpb_ra6e2`, console 115200 baud.
 
-```
-Build → Reserve → Wait → Configure HIL → Upload + explicit flash → Test → Collect → Release
-```
+## Run manually
 
-## Single-workflow method
+1. Add repository secret **ECW_API_KEY** containing your ECW API token.
+2. Open **Actions → ECW CI Job Smoke → Run workflow**, select `demo/ra6-zephyr-twister`, and start it. The displayed workflow name on this branch is **RA6 manual demo**. No pull request or push triggers hardware work.
+3. Leave `booking_id` empty to create a CI booking (cancelled after testing), or supply your active RA6 booking (preserved after testing). Close any other terminal using that booking before starting.
+4. Download the run artifact for firmware, provenance, requests, job metadata, logs and test evidence. On the blinky branch, open `artifacts/camera.html` for the screenshot gallery.
 
-Build, reserve and wait for an active booking in one workflow, then configure
-HIL, upload and explicitly flash firmware, run jobs, and release the booking.
+Defaults: `ECW_BACKEND_URL=https://plovdiv.edgebench.io/api`, `ECW_CONSOLE_URL=wss://plovdiv.edgebench.io`. Optional repository variables with these names override the endpoints. RA6 board identity is checked before programming; it cannot be changed by a repository variable. Auto-booking waits up to 15 minutes; the active session must have over six minutes left.
 
-![Single-workflow method: wait for the booking, configure HIL, upload and flash firmware, then run jobs](docs/diagrams/one-stage-method.svg)
+## What this branch tests
 
-## Two-stage method
+Build-only check on GitHub → book RA6 → twister.run trusted ci_twister_test profile → backend Twister builds and flashes through pytest/RM → identify firmware, five nonce echoes, increasing uptime → JSON/JUnit reports → release
 
-Stage 1 builds and reserves, registers the activation trigger, then ends.
-ECW starts Stage 2 when the booking is active. The claim winner configures
-HIL, uploads and flashes firmware, runs jobs, and releases the booking.
 
-![Two-stage method: Stage 1 ends; ECW dispatches Stage 2 to claim, configure HIL, upload and flash firmware, then run jobs](docs/diagrams/two-stage-method.svg)
 
-Workflow files are on `delelop_2_stages`; follow
-[the two-stage setup guide](docs/07-trigger-mode.md).
+Production currently exposes the trusted admin-installed `ci_twister_test` profile for RA6, using upstream Zephyr v4.4.0. Other ECW deployments must install that reviewed profile first. It runs its reviewed server-side source; GitHub does not upload arbitrary Python to the backend. `app/` mirrors that suite for inspection and local build-only checks. The GitHub build is not a second hardware flash. Runtime firmware is built from the installed profile, and may use the server's pinned Zephyr version rather than the GitHub build's v4.2.0. The job must return exit code 0, a passed case, preserved metadata, Twister JSON and JUnit XML. No ztest/direct-serial shortcut is used.
 
-See [docs/](docs/) for the full walkthrough:
+## Build locally
 
-| Doc | What it covers |
-| --- | --- |
-| [docs/01-getting-started.md](docs/01-getting-started.md) | **Start here.** Use this template, add the secret and variable, create jobs, first Arduino run on dev.edgebench.io |
-| [docs/02-secrets-and-variables.md](docs/02-secrets-and-variables.md) | Creating an API token, repo secrets, repo variables |
-| [docs/03-build-script.md](docs/03-build-script.md) | Writing `.github/user/build/build.sh` for your own project |
-| [docs/04-jobs.md](docs/04-jobs.md) | The CI job / command JSON schema, and the payload generator |
-| [docs/05-api-reference.md](docs/05-api-reference.md) | The ECW backend endpoints this pipeline calls |
-| [docs/06-support-and-liability.md](docs/06-support-and-liability.md) | **Read this** -- what's supported, what's on you |
-| [docs/07-trigger-mode.md](docs/07-trigger-mode.md) | Two-stage setup from `delelop_2_stages`, default-branch requirements and activation claims |
-| [docs/08-arduino-demo.md](docs/08-arduino-demo.md) | The bundled Arduino UNO R4 WiFi demo, explained in full |
-| [docs/09-wait-mode.md](docs/09-wait-mode.md) | The default pipeline job by job: timeouts, booking reuse, artifacts, failures |
-| [docs/10-hil-configuration.md](docs/10-hil-configuration.md) | Configure HIL, frontend-format CSV values, readiness timeout, and upload/flash sequencing |
+Use Python 3.12, west, Zephyr SDK 0.17.2 (ARM toolchain) and the pinned west manifest. In a fresh parent directory:
 
-## Repository layout
-
-```
-.github/
-  workflows/ci-job-smoke.yml   Generic pipeline. Copy as-is; do not edit.
-  scripts/*.py                 Generic helpers the workflow calls. Copy as-is; do not edit.
-  user/
-    build/build.sh              Yours: how your firmware gets built.
-    jobs/*.json                 Yours: which CI jobs run against the board.
-    hil/*.csv                   Yours: frontend-format physical HIL values.
-scripts/
-  generate_job_payload.py       Scaffolds a new .github/user/jobs/*.json file.
-src/                             Example firmware (Arduino UNO R4 WiFi) -- replace with your own.
-docs/                             This documentation, including diagrams.
-tests/                            Offline client checks; no board or API key required.
+```sh
+python -m pip install -r requirements-ci.txt
+west init -l .
+west update --narrow -o=--depth=1
+python -m pip install -r ../zephyr/scripts/requirements.txt
+west zephyr-export
+west sdk install --version 0.17.2 --toolchains arm-zephyr-eabi
+export ZEPHYR_BASE="$(realpath ../zephyr)"
+bash .github/user/build/build.sh
+python -m unittest discover -s tests -v
 ```
 
-## Branches
+`/upload` stores `build/firmware.hex` on NFS. A separate POST to `/v1/artifacts/my-uploads` flashes that exact stored filename. HIL preparation is completed before MCU upload/flash. Cleanup and evidence publishing run on failure; force-stopping a runner can still interrupt cleanup, and the booking eventually expires.
 
-- `main` -- the default template, using one workflow with a booking Wait job.
-  Documentation for both wait mode and two-stage mode is available here.
-- `develop` -- development of the template. Check its workflow triggers when
-  choosing which branch to copy.
-- `delelop_2_stages` -- the two-stage version, formerly named `trigger`.
-  Stage 1 builds and reserves; ECW starts Stage 2 after session activation.
-  Stage 2 claims the run, configures HIL, uploads and flashes MCU firmware,
-  runs jobs, and releases the booking.
+All four demo branches share a repository-wide RA6 concurrency group. Other repositories or interactive users are still governed by ECW booking and RM ownership.
 
-The two-stage workflow files are on `delelop_2_stages`, not on this branch.
-Copy them into the default branch of the repository that will run them;
-see [the two-stage setup guide](docs/07-trigger-mode.md).
+## Sources
 
-## Quick start
+Adapted from [nxp-zephyr-projects](https://github.com/DevHeadsCommunity/nxp-zephyr-projects/tree/7f4af26), retaining its Zephyr v4.2.0 basis and CMake application layout. The west manifest fixes its original remote declarations and targets RA6. Firmware and wiring are inspired by `ECW_Lab/ecw_demos/fpb-ra6e2`; CI API helpers come from the ECW public CI template. No backend changes are required.
 
-1. Click **Use this template > Create a new repository** on this page (or
-   copy `.github/`, `scripts/`, `src/`, and `tests/` into your own repo).
-2. Follow [docs/01-getting-started.md](docs/01-getting-started.md): it walks
-   through the `ECW_API_KEY` secret, the `BOARD_NAME` variable, the CI job
-   files, and your first run on the Arduino UNO R4 WiFi.
-3. Want ECW to wake your pipeline instead of a runner polling? See the
-   [two-stage setup](docs/07-trigger-mode.md) using `delelop_2_stages`.
-
-## HIL configuration and firmware upload
-
-Set `HIL_SENSOR_NAME` and place frontend-format CSV values under
-`.github/user/hil/`. Configure HIL prepares the approved sensor image, waits
-for programming and activation to succeed within three minutes, and sends
-the CSV values.
-The following Upload step stores the MCU firmware and explicitly flashes it;
-Test starts only after both operations succeed. Blank `HIL_SENSOR_NAME`
-skips the HIL setup. See [the HIL guide](docs/10-hil-configuration.md).
-
-Offline client checks: `python3 -m unittest discover -s tests -v`.
-
-## Configure your repository before running
-
-A template copy does not inherit the source repository's secrets or variables.
-Set them under **Settings > Secrets and variables > Actions**:
-
-| Setting | Type | Purpose |
-| --- | --- | --- |
-| `ECW_API_KEY` | Secret | Token for the chosen ECW environment and booking owner. |
-| `BOARD_NAME` | Variable | Board type to book; required. |
-| `ECW_BACKEND_URL` | Variable | API base URL for that environment. Production example: `https://www.edgebench.io/api`. |
-| `HIL_SENSOR_NAME` | Variable | Exact inventory sensor name. Blank skips HIL configuration. |
-| `HIL_CSV_FILE` | Variable, optional | CSV path relative to `.github/user/hil/`; defaults to the selected sensor's example file. |
-| `ECW_DISPATCH_PAT` | Secret, two-stage mode | Credential allowing ECW to dispatch Stage 2. |
-
-Use CSV files exported from the frontend; the provided files contain 100
-physical-value samples. Configure HIL uses the existing frontend APIs and
-waits up to three minutes for preparation/activation success before sending
-the CSV. The Upload step then stores the MCU firmware and explicitly flashes
-it before jobs start. No new backend route is required.
-
-The selected backend must already expose `/v1/peripheral-prepare` and the
-other routes in [the HIL guide](docs/10-hil-configuration.md). An older backend
-without this route cannot complete Configure HIL. See
-[secrets and variables](docs/02-secrets-and-variables.md) for setup details.
+See [the demo flow](docs/flow.svg). Offline checks and build success are separate from a passing physical-board run.

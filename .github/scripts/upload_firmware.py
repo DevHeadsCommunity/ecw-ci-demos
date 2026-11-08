@@ -1,4 +1,4 @@
-"""Upload the build's single .bin to ECW storage without programming the board."""
+"""Upload the build's single firmware image (.bin or .hex) to ECW storage without programming the board."""
 
 from __future__ import annotations
 
@@ -15,16 +15,16 @@ def main() -> str:
     backend_url = os.environ["ECW_BACKEND_URL"].rstrip("/")
     api_key = os.environ["ECW_API_KEY"]
     booking_id = int(os.environ["ECW_BOOKING_ID"])
-    bin_files = sorted(path for path in BUILD_DIR.glob("*.bin") if path.is_file())
+    bin_files = sorted(path for path in BUILD_DIR.iterdir() if path.is_file() and path.suffix in {".bin", ".hex"})
     if len(bin_files) != 1:
-        raise SystemExit("build/ must contain exactly one .bin file before uploading.")
+        raise SystemExit("build/ must contain exactly one .bin file or .hex file before uploading.")
     firmware = bin_files[0]
     if firmware.stat().st_size == 0:
-        raise SystemExit("The firmware .bin file is empty.")
+        raise SystemExit("The firmware image is empty.")
 
     # Send a backend-safe basename ourselves, preserving the extension and the
     # backend's 64-character limit. Flash must use this name, not the local one.
-    code = re.sub(r"[^A-Za-z0-9._]", "_", firmware.stem)[:60] + ".bin"
+    code = re.sub(r"[^A-Za-z0-9._]", "_", firmware.stem)[:60] + firmware.suffix
     response = upload_file(
         f"{backend_url}/upload", api_key, firmware, code,
         params={"booking_id": booking_id},

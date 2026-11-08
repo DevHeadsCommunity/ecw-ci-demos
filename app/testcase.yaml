@@ -1,0 +1,12 @@
+tests:
+  ecw.ci_twister_test:
+    platform_allow:
+      - fpb_ra6e2
+    tags:
+      - ecw
+      - hil
+    harness: pytest
+    timeout: 120
+    harness_config:
+      pytest_root:
+        - pytest
