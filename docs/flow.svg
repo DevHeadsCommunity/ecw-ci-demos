@@ -1,0 +1,101 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1600" height="1250" viewBox="0 0 1600 1250" role="img" aria-labelledby="title desc">
+<title id="title">RA6 blinky: booking, upload, flash, timed camera capture and cleanup</title>
+<desc id="desc">Nine phases of the manual ECW blinky workflow. LED toggles every 50 milliseconds. A continuous authenticated MJPEG stream supplies 67 screenshot saves at 30 millisecond intervals over two seconds. Actual frame arrival and save times are recorded; optical LED state is reviewed by the user.</desc>
+<defs><marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse"><path d="M0 0L10 5L0 10Z" fill="#7996b9"/></marker></defs>
+<rect width="1600" height="1250" fill="#0b1220"/>
+<g font-family="DejaVu Sans, Arial, sans-serif" fill="#edf3ff">
+<text x="45" y="55" font-size="32" fill="#edf3ff" font-weight="bold">RA6 blinky · from build to camera evidence</text>
+<text x="45" y="91" font-size="21" fill="#a9bed8" font-weight="normal">Manual dispatch · FPB-RA6E2 / board 23 · ECW API + Resource Manager</text>
+<rect x="45" y="125" width="490" height="142" rx="14" fill="#142137" stroke="#44c7b5"/>
+<text x="63" y="156" font-size="22" fill="#44c7b5" font-weight="bold">1  Build</text>
+<text x="63" y="182" font-size="16" fill="#a9bed8" font-weight="normal">GitHub runner</text>
+<text x="63" y="216" font-size="18" fill="#edf3ff" font-weight="normal">Zephyr v4.2.0 + SDK 0.17.2</text>
+<text x="63" y="243" font-size="18" fill="#edf3ff" font-weight="normal">HEX image + SHA256 provenance</text>
+<path d="M536 196 L553 196" stroke="#7996b9" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="555" y="125" width="490" height="142" rx="14" fill="#142137" stroke="#44c7b5"/>
+<text x="573" y="156" font-size="22" fill="#44c7b5" font-weight="bold">2  Book / validate</text>
+<text x="573" y="182" font-size="16" fill="#a9bed8" font-weight="normal">ECW backend</text>
+<text x="573" y="216" font-size="18" fill="#edf3ff" font-weight="normal">Owned, active FPB-RA6E2 booking</text>
+<text x="573" y="243" font-size="18" fill="#edf3ff" font-weight="normal">More than six minutes remaining</text>
+<path d="M1046 196 L1063 196" stroke="#7996b9" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="1065" y="125" width="490" height="142" rx="14" fill="#142137" stroke="#44c7b5"/>
+<text x="1083" y="156" font-size="22" fill="#44c7b5" font-weight="bold">3  Upload to NFS</text>
+<text x="1083" y="182" font-size="16" fill="#a9bed8" font-weight="normal">ECW storage API</text>
+<text x="1083" y="216" font-size="18" fill="#edf3ff" font-weight="normal">POST /upload stores the HEX</text>
+<text x="1083" y="243" font-size="18" fill="#edf3ff" font-weight="normal">Verify its name in the upload manifest</text>
+<path d="M1310 268 V280 H290 V290" fill="none" stroke="#7996b9" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="45" y="291" width="490" height="142" rx="14" fill="#142137" stroke="#44c7b5"/>
+<text x="63" y="322" font-size="22" fill="#44c7b5" font-weight="bold">4  Explicit flash</text>
+<text x="63" y="348" font-size="16" fill="#a9bed8" font-weight="normal">Backend → RM → RA6</text>
+<text x="63" y="382" font-size="18" fill="#edf3ff" font-weight="normal">POST the stored filename to flash</text>
+<text x="63" y="409" font-size="18" fill="#edf3ff" font-weight="normal">Continue only after success</text>
+<path d="M536 362 L553 362" stroke="#7996b9" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="555" y="291" width="490" height="142" rx="14" fill="#142137" stroke="#44c7b5"/>
+<text x="573" y="322" font-size="22" fill="#44c7b5" font-weight="bold">5  Connect + warm up</text>
+<text x="573" y="348" font-size="16" fill="#a9bed8" font-weight="normal">Camera stream + console</text>
+<text x="573" y="382" font-size="18" fill="#edf3ff" font-weight="normal">Wait for first JPEG and RM banner</text>
+<text x="573" y="409" font-size="18" fill="#edf3ff" font-weight="normal">Authenticate console with a ticket</text>
+<path d="M1046 362 L1063 362" stroke="#7996b9" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="1065" y="291" width="490" height="142" rx="14" fill="#142137" stroke="#44c7b5"/>
+<text x="1083" y="322" font-size="22" fill="#44c7b5" font-weight="bold">6  Start LED</text>
+<text x="1083" y="348" font-size="16" fill="#a9bed8" font-weight="normal">Console → RM → RA6</text>
+<text x="1083" y="382" font-size="18" fill="#edf3ff" font-weight="normal">led blink &lt;nonce&gt;</text>
+<text x="1083" y="409" font-size="18" fill="#edf3ff" font-weight="normal">Wait for matching BLINK 50 reply</text>
+<path d="M1310 434 V446 H290 V456" fill="none" stroke="#7996b9" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="45" y="457" width="490" height="142" rx="14" fill="#142137" stroke="#78aaff"/>
+<text x="63" y="488" font-size="22" fill="#78aaff" font-weight="bold">7  Capture for 2 seconds</text>
+<text x="63" y="514" font-size="16" fill="#a9bed8" font-weight="normal">GitHub + continuous camera stream</text>
+<text x="63" y="548" font-size="18" fill="#edf3ff" font-weight="normal">67 saves at 0, 30, …, 1980 ms</text>
+<text x="63" y="575" font-size="18" fill="#edf3ff" font-weight="normal">Record actual time, source ID and age</text>
+<path d="M536 528 L553 528" stroke="#7996b9" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="555" y="457" width="490" height="142" rx="14" fill="#142137" stroke="#78aaff"/>
+<text x="573" y="488" font-size="22" fill="#78aaff" font-weight="bold">8  Check + stop</text>
+<text x="573" y="514" font-size="16" fill="#a9bed8" font-weight="normal">Client + RA6</text>
+<text x="573" y="548" font-size="18" fill="#edf3ff" font-weight="normal">Write report/gallery; verify JPEGs</text>
+<text x="573" y="575" font-size="18" fill="#edf3ff" font-weight="normal">Send LED OFF; require matching reply</text>
+<path d="M1046 528 L1063 528" stroke="#7996b9" stroke-width="2" marker-end="url(#arrow)"/>
+<rect x="1065" y="457" width="490" height="142" rx="14" fill="#142137" stroke="#78aaff"/>
+<text x="1083" y="488" font-size="22" fill="#78aaff" font-weight="bold">9  Close + release</text>
+<text x="1083" y="514" font-size="16" fill="#a9bed8" font-weight="normal">Backend + GitHub</text>
+<text x="1083" y="548" font-size="18" fill="#edf3ff" font-weight="normal">Close streams; release new booking</text>
+<text x="1083" y="575" font-size="18" fill="#edf3ff" font-weight="normal">Preserve supplied booking; publish files</text>
+<text x="45" y="667" font-size="26" fill="#edf3ff" font-weight="bold">Two clocks run in parallel during capture</text>
+<text x="45" y="702" font-size="19" fill="#a9bed8" font-weight="normal">Capture t = 0 starts after the BLINK acknowledgement; setup and cleanup are outside this window.</text>
+<rect x="45" y="725" width="1510" height="272" rx="14" fill="#142137" stroke="#314762"/>
+<text x="66" y="761" font-size="20" fill="#78aaff" font-weight="bold">Timing zoom · 0–300 ms</text>
+<text x="66" y="805" font-size="18" fill="#edf3ff" font-weight="normal">LED · nominal 50 ms</text>
+<text x="66" y="884" font-size="18" fill="#edf3ff" font-weight="normal">JPEG save · 30 ms</text>
+<line x1="330.0" y1="777" x2="330.0" y2="903" stroke="#263d58"/>
+<text x="320.0" y="934" font-size="15" fill="#a9bed8" font-weight="normal">0</text>
+<line x1="520.0" y1="777" x2="520.0" y2="903" stroke="#263d58"/>
+<text x="510.0" y="934" font-size="15" fill="#a9bed8" font-weight="normal">50</text>
+<line x1="710.0" y1="777" x2="710.0" y2="903" stroke="#263d58"/>
+<text x="700.0" y="934" font-size="15" fill="#a9bed8" font-weight="normal">100</text>
+<line x1="900.0" y1="777" x2="900.0" y2="903" stroke="#263d58"/>
+<text x="890.0" y="934" font-size="15" fill="#a9bed8" font-weight="normal">150</text>
+<line x1="1090.0" y1="777" x2="1090.0" y2="903" stroke="#263d58"/>
+<text x="1080.0" y="934" font-size="15" fill="#a9bed8" font-weight="normal">200</text>
+<line x1="1280.0" y1="777" x2="1280.0" y2="903" stroke="#263d58"/>
+<text x="1270.0" y="934" font-size="15" fill="#a9bed8" font-weight="normal">250</text>
+<line x1="1470.0" y1="777" x2="1470.0" y2="903" stroke="#263d58"/>
+<text x="1460.0" y="934" font-size="15" fill="#a9bed8" font-weight="normal">300</text>
+<path d="M330 794 H520.0 V826 H710.0 V794 H900.0 V826 H1090.0 V794 H1280.0 V826 H1470.0" fill="none" stroke="#44c7b5" stroke-width="4"/>
+<line x1="330.0" y1="863" x2="330.0" y2="892" stroke="#e9bc69" stroke-width="2"/><circle cx="330.0" cy="877" r="5" fill="#e9bc69"/>
+<line x1="444.0" y1="863" x2="444.0" y2="892" stroke="#e9bc69" stroke-width="2"/><circle cx="444.0" cy="877" r="5" fill="#e9bc69"/>
+<line x1="558.0" y1="863" x2="558.0" y2="892" stroke="#e9bc69" stroke-width="2"/><circle cx="558.0" cy="877" r="5" fill="#e9bc69"/>
+<line x1="672.0" y1="863" x2="672.0" y2="892" stroke="#e9bc69" stroke-width="2"/><circle cx="672.0" cy="877" r="5" fill="#e9bc69"/>
+<line x1="786.0" y1="863" x2="786.0" y2="892" stroke="#e9bc69" stroke-width="2"/><circle cx="786.0" cy="877" r="5" fill="#e9bc69"/>
+<line x1="900.0" y1="863" x2="900.0" y2="892" stroke="#e9bc69" stroke-width="2"/><circle cx="900.0" cy="877" r="5" fill="#e9bc69"/>
+<line x1="1014.0" y1="863" x2="1014.0" y2="892" stroke="#e9bc69" stroke-width="2"/><circle cx="1014.0" cy="877" r="5" fill="#e9bc69"/>
+<line x1="1128.0" y1="863" x2="1128.0" y2="892" stroke="#e9bc69" stroke-width="2"/><circle cx="1128.0" cy="877" r="5" fill="#e9bc69"/>
+<line x1="1242.0" y1="863" x2="1242.0" y2="892" stroke="#e9bc69" stroke-width="2"/><circle cx="1242.0" cy="877" r="5" fill="#e9bc69"/>
+<line x1="1356.0" y1="863" x2="1356.0" y2="892" stroke="#e9bc69" stroke-width="2"/><circle cx="1356.0" cy="877" r="5" fill="#e9bc69"/>
+<line x1="1470.0" y1="863" x2="1470.0" y2="892" stroke="#e9bc69" stroke-width="2"/><circle cx="1470.0" cy="877" r="5" fill="#e9bc69"/>
+<text x="67" y="976" font-size="19" fill="#a9bed8" font-weight="normal">Full window: 0 … 1980 ms = 67 save slots; wait the final 20 ms to complete 2 seconds.</text>
+<rect x="45" y="1020" width="1510" height="170" rx="14" fill="#142137" stroke="#e9bc69"/>
+<text x="65" y="1053" font-size="22" fill="#e9bc69" font-weight="bold">Read the evidence correctly</text>
+<text x="65" y="1085" font-size="20" fill="#edf3ff" font-weight="normal">Camera frame arrival has its own rate. A 30 ms save may reuse the previous source frame.</text>
+<text x="65" y="1117" font-size="19" fill="#edf3ff" font-weight="normal">verification.json records source_sequence, captured_ms, frame_age_ms and SHA256 for every screenshot.</text>
+<text x="65" y="1149" font-size="18" fill="#edf3ff" font-weight="normal">Open camera.html to review the LED visually. This diagram does not claim measured LED edges or optical classification.</text>
+<text x="45" y="1225" font-size="18" fill="#a9bed8" font-weight="normal">On failure: attempt LED OFF → close console/video → release a booking created by this run → publish available evidence.</text>
+</g></svg>

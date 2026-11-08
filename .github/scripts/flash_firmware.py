@@ -13,7 +13,7 @@ def main() -> None:
     api_key = os.environ["ECW_API_KEY"]
     booking_id = int(os.environ["ECW_BOOKING_ID"])
     code = os.environ.get("ECW_FIRMWARE_CODE", "")
-    if not re.fullmatch(r"[A-Za-z0-9._]{1,60}\.bin", code):
+    if not re.fullmatch(r"[A-Za-z0-9._]{1,60}\.(?:bin|hex)", code):
         raise SystemExit("ECW_FIRMWARE_CODE must be the stored filename returned by Upload.")
 
     # This side effect is explicit and is never automatically retried. Upload

@@ -1,0 +1,1 @@
+Starter: DevHeadsCommunity/nxp-zephyr-projects @ 7f4af26 (MIT; see STARTER-LICENSE.txt). RA6 hardware examples: ECW_Lab/ecw_demos/fpb-ra6e2. Backend CI client: ECW CI GitHub Actions template. This demo ports the application structure and pinned Zephyr basis to RA6.
