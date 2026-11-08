@@ -1,0 +1,31 @@
+/*
+ * ECW HIL sensor on the FPB-RA6E2 Arduino header J1 (SPI0, the board's D10-D13 pins), ECW prod
+ * wiring (ECW_Prod_mapping.xlsx, RA6E2 row; the sheet lists the board's own MISO/MOSI) - unswapped:
+ *   J1-5 D12 P110 MISOA (MCU input), J1-4 D11 P109 MOSIA (MCU output),
+ *   J1-6 D13 P111 RSPCKA, J1-3 D10 P301 SS (driven as a GPIO, cs-gpios)
+ * Pins from the FPB-RA6E2 v1 User's Manual. The board's default SPI0 pins drive SSLA0 in hardware;
+ * here CS is a GPIO so the 2 us CS setup/hold of the gen-2 sketches can be kept.
+ */
+&pinctrl {
+	spi0_ecw: spi0_ecw {
+		group1 {
+			/* MISO MOSI RSPCK */
+			psels = <RA_PSEL(RA_PSEL_SPI, 1, 10)>,
+				<RA_PSEL(RA_PSEL_SPI, 1, 9)>,
+				<RA_PSEL(RA_PSEL_SPI, 1, 11)>;
+		};
+	};
+};
+
+&spi0 {
+	pinctrl-0 = <&spi0_ecw>;
+	pinctrl-names = "default";
+	cs-gpios = <&ioport3 1 GPIO_ACTIVE_LOW>;
+	status = "okay";
+
+	ecw_sensor: ecw-sensor@0 {
+		compatible = "vnd,spi-device";
+		reg = <0>;
+		spi-max-frequency = <125000>;		/* gen-2 sketches bit-bang at ~100-200 kHz */
+	};
+};

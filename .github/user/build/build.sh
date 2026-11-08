@@ -1,37 +1,27 @@
 #!/usr/bin/env bash
-# Project-owned build script.
-#
-# ci-job-smoke.yml's Build job never changes to build a different project or
-# board -- it only ever runs `.github/user/build/build.sh`. Everything
-# specific to *this* project (which board, which core, which sketch, how to
-# compile it) lives here instead, so changing the build process never means
-# touching the workflow.
-#
-# Contract with the workflow:
-#   - Runs from the repository root, after checkout.
-#   - Must leave exactly one *.bin file inside ./build/ (the whole
-#     directory is uploaded as the artifact; the Upload job finds that one
-#     file by extension, not by name, so it can be called anything).
-
 set -euo pipefail
-
-FQBN="arduino:renesas_uno:unor4wifi"
-ARDUINO_CORE="arduino:renesas_uno"
-FIRMWARE_SKETCH="src/arduino_ci_demo"
-
-if ! command -v arduino-cli >/dev/null 2>&1; then
-  mkdir -p "$HOME/bin"
-  curl -fsSL https://raw.githubusercontent.com/arduino/arduino-cli/master/install.sh | BINDIR="$HOME/bin" sh
-  export PATH="$HOME/bin:$PATH"
+repo_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)"
+: "${ZEPHYR_BASE:?Initialize west and set ZEPHYR_BASE to the pinned Zephyr checkout}"
+export ZEPHYR_TOOLCHAIN_VARIANT=zephyr
+expected_zephyr=413b789deb391d3a37d06b463288a5fe765ee57e
+if [ "$(git -C "$ZEPHYR_BASE" rev-parse HEAD)" != "$expected_zephyr" ]; then
+  echo "Expected upstream Zephyr v4.2.0 ($expected_zephyr)" >&2
+  exit 1
 fi
-
-arduino-cli core update-index
-arduino-cli core install "${ARDUINO_CORE}"
-
-# ArduinoGraphics renders the scrolling text on the onboard LED matrix;
-# unlike Arduino_LED_Matrix it isn't bundled with the core.
-arduino-cli lib update-index
-arduino-cli lib install "ArduinoGraphics"
-
-mkdir -p build
-arduino-cli compile --fqbn "${FQBN}" "${FIRMWARE_SKETCH}" --output-dir build
+cd "$ZEPHYR_BASE"
+west build -p always -b fpb_ra6e2 "$repo_dir/app" -d "$repo_dir/build/zephyr"
+cp "$repo_dir/build/zephyr/zephyr/zephyr.hex" "$repo_dir/build/firmware.hex"
+if [ "$(python -c 'import json,sys; print(json.load(open(sys.argv[1]))["demo"])' "$repo_dir/demo.json")" = twister ]; then
+  python scripts/twister -T "$repo_dir/app" -p fpb_ra6e2 --build-only --outdir "$repo_dir/build/twister" --inline-logs
+fi
+cd "$repo_dir"
+python - <<'PROVENANCE'
+import hashlib,json,os,subprocess
+from pathlib import Path
+image=Path('build/firmware.hex')
+payload={'platform':'fpb_ra6e2','zephyr_commit':subprocess.check_output(['git','-C',os.environ['ZEPHYR_BASE'],'rev-parse','HEAD'],text=True).strip(),
+         'demo_commit':subprocess.check_output(['git','rev-parse','HEAD'],text=True).strip(),
+         'sha256':hashlib.sha256(image.read_bytes()).hexdigest(),'bytes':image.stat().st_size,
+         'sdk_requested':'0.17.2'}
+Path('build/provenance.json').write_text(json.dumps(payload,indent=2)+'\n')
+PROVENANCE
